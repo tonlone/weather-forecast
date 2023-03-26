@@ -226,6 +226,7 @@ window.addEventListener('load', ()=>{
             'Light sleet showers': Skycons.RAIN_SNOW_SHOWERS_DAY,
             'Moderate or heavy sleet showers': Skycons.SNOW_SHOWERS_DAY,
             'Light snow showers': Skycons.SNOW_SHOWERS_DAY,
+            'Moderate or heavy snow showers': Skycons.SNOW_SHOWERS_DAY,
             'Light showers of ice pellets': Skycons.RAIN_SNOW,
             'Moderate or heavy showers of ice pellets': Skycons.RAIN_SNOW,
             'Patchy light rain with thunder': Skycons.THUNDER_SHOWERS_DAY,
