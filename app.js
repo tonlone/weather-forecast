@@ -131,6 +131,7 @@ window.addEventListener('load', ()=>{
             'rain': Skycons.RAIN,
             'psbl_rain': Skycons.RAIN,
             'rain_shower': Skycons.SHOWERS_DAY,
+            'tstorm': Skycons.THUNDER_RAIN,
             'thunderstorm': Skycons.THUNDER_RAIN,
             'local_thunderstorms': Skycons.THUNDER_SHOWERS_DAY,
             'light_snow': Skycons.SNOW,
