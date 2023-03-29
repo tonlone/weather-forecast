@@ -40,10 +40,13 @@ window.addEventListener('load', ()=>{
                     //const date = day.day;
                     const date = convertDate(day.day);
                     const temperature = `${day.all_day.temperature.toFixed(0)}&deg;` + unit;
+                    const maxTemp = day.all_day.temperature_max.toFixed(0);
+                    const minTemp = day.all_day.temperature_min.toFixed(0);
+                    const minMaxTemp = minTemp + " to " + maxTemp + "&deg;" + unit;
                     const windSpeed = `${day.all_day.wind.speed} km/hr`;
                     const weather = day.summary;
                     const iconID= "icon" + i;
-                    const row = `<tr><td>${date}</td><td>${temperature}</td><td>${windSpeed}</td><td><canvas id="${iconID}" class="icon" width="20" height="20"></canvas></td><td>${weather}</td></tr>`;
+                    const row = `<tr><td>${date}</td><td>${temperature}</td><td>${minMaxTemp}</td><td>${windSpeed}</td><td><canvas id="${iconID}" class="icon" width="20" height="20"></canvas></td><td>${weather}</td></tr>`;
                     forecastTable.insertAdjacentHTML('beforeend', row);
                     addWeatherIcon(iconID, day.weather);
                     i++;
@@ -75,10 +78,13 @@ window.addEventListener('load', ()=>{
                         forecast.forEach(day => {
                             const date = new Date(day.dt * 1000).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
                             const temperature = `${day.main.temp.toFixed(0)}&deg;C`;
+                            const maxTemp = day.main.temp_max.toFixed(0);
+                            const minTemp = day.main.temp_min.toFixed(0);
+                            const minMaxTemp = minTemp + " to " + maxTemp + "&deg;C";
                             const windSpeed = `${day.wind.speed} km/hr`;
                             const weather = day.weather[0].description;
                             const iconID= "icon" + i;
-                            const row = `<tr><td>${date}</td><td>${temperature}</td><td>${windSpeed}</td><td><canvas id="${iconID}" class="icon" width="20" height="20"></canvas></td><td>${weather}</td></tr>`;
+                            const row = `<tr><td>${date}</td><td>${temperature}</td><td>${minMaxTemp}</td><td>${windSpeed}</td><td><canvas id="${iconID}" class="icon" width="20" height="20"></canvas></td><td>${weather}</td></tr>`;
                             forecastTable.insertAdjacentHTML('beforeend', row);
                             addWeatherIcon(iconID, weather);
                             i++;
@@ -98,10 +104,13 @@ window.addEventListener('load', ()=>{
                 forecast.forEach(day => {
                     const date = convertDate(day.date);
                     const temperature = `${day.day.avgtemp_c.toFixed(0)}&deg;C`;
+                    const maxTemp = day.day.maxtemp_c.toFixed(0);
+                    const minTemp = day.day.mintemp_c.toFixed(0);
+                    const minMaxTemp = minTemp + " to " + maxTemp + "&deg;C";
                     const windSpeed = `${day.day.maxwind_kph} km/hr`;
                     const weather = day.day.condition.text;
                     const iconID= "icon" + i;
-                    const row = `<tr><td>${date}</td><td>${temperature}</td><td>${windSpeed}</td><td><canvas id="${iconID}" class="icon" width="20" height="20"></canvas></td><td>${weather}</td></tr>`;
+                    const row = `<tr><td>${date}</td><td>${temperature}</td><td>${minMaxTemp}</td><td>${windSpeed}</td><td><canvas id="${iconID}" class="icon" width="20" height="20"></canvas></td><td>${weather}</td></tr>`;
                     forecastTable.insertAdjacentHTML('beforeend', row);
                     addWeatherIcon(iconID, weather);
                     i++;
