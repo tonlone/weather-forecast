@@ -151,7 +151,7 @@ window.addEventListener('load', ()=>{
             'rain_and_snow': Skycons.SNOW_SHOWERS_DAY,
             'psbl_rain_and_snow': Skycons.SNOW_SHOWERS_DAY,
             'freezing_rain': Skycons.SNOW_SHOWERS_DAY,
-            'psbl_freezing_rain': Skycons.SNOW_SHOWERS_DAY,
+            'psbl_fr_rain': Skycons.SNOW_SHOWERS_DAY,
             'hail': Skycons.HAIL,
             'clear_(night)': Skycons.CLEAR_NIGHT,
             'mostly_clear_(night)': Skycons.PARTLY_CLOUDY_NIGHT,
