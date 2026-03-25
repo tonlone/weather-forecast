@@ -1,282 +1,413 @@
-window.addEventListener('load', ()=>{
-    let currentDateAndTime = document.querySelector('.date-and-time');
-    let location = document.querySelector('.location-section .location');
-    let i = 1;
+"use strict";
 
-    if(navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(position => {
-            const long = position.coords.longitude;
-            const lat = position.coords.latitude;
+(function () {
+    /* -- Config -- */
+    const METEO_KEY = "hf8s8cz1r4id5grsyei8mfkd5v6ny0f9p7yr49vl";
+    const WEATHER_API_KEY = "52c5ddc336f14e3299d13034232603";
+    const OPEN_WEATHER_KEY = "63cb006c1a1e46e96e9ff2e1c12f498c";
+    const BIGDATA_KEY = "bdc_8fbc9f42b0d04e6dafb55be580ad2aac";
+    const DEFAULT_LAT = 43.8828;
+    const DEFAULT_LON = -79.4403;
+    const GEO_TIMEOUT = 10000;
 
-            // // Get the user's location using the Geolocation API
-            setLocation(lat, long, location);
+    /* -- State -- */
+    let useCelsius = true;
+    let forecastData = { meteosource: null, weatherapi: null, openweather: null };
+    let locationName = "";
 
-            // Get the user's weather using the OpenWeather API
-            setWeather(lat, long);
+    /* -- DOM refs -- */
+    const $ = (s) => document.querySelector(s);
+    const elLoading = $("#loading-overlay");
+    const elError = $("#error-message");
+    const elErrorText = $("#error-text");
+    const elMain = $("#main-content");
+    const elUnitToggle = $("#unit-toggle");
+    const elLocation = $("#location-name");
+    const elDateTime = $("#current-datetime");
 
-            currentDateAndTime.textContent = getCurrentDate().toString();
+    /* -- Weather Emoji Map -- */
+    const weatherEmojis = {
+        /* MeteoSource */
+        'sunny': '☀️', 'mostly_sunny': '🌤️', 'partly_sunny': '⛅', 'mostly_cloudy': '🌥️',
+        'cloudy': '☁️', 'overcast': '☁️', 'overcast_with_low_clouds': '☁️',
+        'fog': '🌫️', 'light_rain': '🌦️', 'rain': '🌧️', 'psbl_rain': '🌧️',
+        'rain_shower': '🌦️', 'tstorm': '⛈️', 'tstorm_shower': '⛈️',
+        'thunderstorm': '⛈️', 'local_thunderstorms': '⛈️',
+        'light_snow': '🌨️', 'snow': '❄️', 'psbl_snow': '❄️',
+        'snow_shower': '🌨️', 'rain_and_snow': '🌨️', 'psbl_rain_and_snow': '🌨️',
+        'freezing_rain': '🌨️', 'psbl_fr_rain': '🌨️', 'hail': '🧊',
+        'clear_(night)': '🌙', 'mostly_clear_(night)': '🌙', 'partly_clear_(night)': '🌙',
+        'cloudy_(night)': '☁️', 'overcast_with_low_clouds_(night)': '☁️',
+        'rain_shower_(night)': '🌧️', 'local_thunderstorms_(night)': '⛈️',
+        'snow_shower_(night)': '🌨️', 'rain_and_snow_(night)': '🌨️',
+        'psbl_freezing_rain_(night)': '🌨️',
+
+        /* Open Weather */
+        'clear sky': '☀️', 'few clouds': '🌤️', 'scattered clouds': '⛅',
+        'broken clouds': '🌥️', 'overcast clouds': '☁️',
+        'light rain': '🌦️', 'moderate rain': '🌧️', 'heavy intensity rain': '🌧️',
+        'very heavy rain': '🌧️', 'extreme rain': '🌧️', 'freezing rain': '🌨️',
+        'light intensity shower rain': '🌦️', 'shower rain': '🌧️',
+        'heavy intensity shower rain': '🌧️', 'ragged shower rain': '🌧️',
+        'light snow': '🌨️', 'snow': '❄️', 'heavy snow': '❄️',
+        'sleet': '🌨️', 'shower sleet': '🌨️',
+        'light rain and snow': '🌨️', 'rain and snow': '🌨️',
+        'light shower snow': '🌨️', 'shower snow': '🌨️', 'heavy shower snow': '🌨️',
+        'thunderstorm': '⛈️', 'thunderstorm with light rain': '⛈️',
+        'thunderstorm with rain': '⛈️', 'thunderstorm with heavy rain': '⛈️',
+        'haze': '🌫️', 'mist': '🌫️', 'smoke': '🌫️', 'fog': '🌫️',
+
+        /* WeatherAPI */
+        'Sunny': '☀️', 'Clear': '🌙', 'Partly cloudy': '⛅', 'Cloudy': '🌥️',
+        'Overcast': '☁️', 'Mist': '🌫️', 'Fog': '🌫️', 'Freezing fog': '🌫️',
+        'Patchy rain possible': '🌦️', 'Patchy snow possible': '🌨️',
+        'Patchy sleet possible': '🌨️', 'Patchy freezing drizzle possible': '🌦️',
+        'Thundery outbreaks possible': '⛈️', 'Blowing snow': '❄️', 'Blizzard': '❄️',
+        'Patchy light drizzle': '🌦️', 'Light drizzle': '🌦️',
+        'Freezing drizzle': '🌦️', 'Heavy freezing drizzle': '🌦️',
+        'Patchy light rain': '🌦️', 'Light rain': '🌦️',
+        'Moderate rain at times': '🌧️', 'Moderate rain': '🌧️',
+        'Heavy rain at times': '🌧️', 'Heavy rain': '🌧️',
+        'Light freezing rain': '🌨️', 'Moderate or heavy freezing rain': '🌨️',
+        'Light sleet': '🌨️', 'Moderate or heavy sleet': '🌨️',
+        'Patchy light snow': '🌨️', 'Light snow': '🌨️',
+        'Patchy moderate snow': '❄️', 'Moderate snow': '❄️',
+        'Patchy heavy snow': '❄️', 'Heavy snow': '❄️', 'Ice pellets': '🧊',
+        'Light rain shower': '🌦️', 'Moderate or heavy rain shower': '🌧️',
+        'Torrential rain shower': '🌧️',
+        'Light sleet showers': '🌨️', 'Moderate or heavy sleet showers': '🌨️',
+        'Light snow showers': '🌨️', 'Moderate or heavy snow showers': '🌨️',
+        'Light showers of ice pellets': '🧊', 'Moderate or heavy showers of ice pellets': '🧊',
+        'Patchy light rain with thunder': '⛈️', 'Moderate or heavy rain with thunder': '⛈️',
+        'Patchy light snow with thunder': '⛈️', 'Moderate or heavy snow with thunder': '⛈️',
+
+        'default': '🌡️'
+    };
+
+    function getEmoji(condition) {
+        if (!condition) return weatherEmojis['default'];
+        return weatherEmojis[condition] || weatherEmojis[condition.toLowerCase()] || weatherEmojis['default'];
+    }
+
+    /* -- Temperature Conversion -- */
+    function tempC(val) { return Math.round(val); }
+    function tempDisplay(celsius) {
+        if (useCelsius) return Math.round(celsius) + "°C";
+        return Math.round(celsius * 9 / 5 + 32) + "°F";
+    }
+    function tempNum(celsius) {
+        if (useCelsius) return Math.round(celsius);
+        return Math.round(celsius * 9 / 5 + 32);
+    }
+    function tempUnit() { return useCelsius ? "°C" : "°F"; }
+
+    /* -- Date Formatting -- */
+    function formatDay(dateStr) {
+        const d = new Date(dateStr + "T12:00:00");
+        return d.toLocaleDateString("en-US", { weekday: "long" });
+    }
+    function formatDate(dateStr) {
+        const d = new Date(dateStr + "T12:00:00");
+        return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    }
+    function formatDateFromTimestamp(ts) {
+        const d = new Date(ts * 1000);
+        return d.toISOString().split("T")[0];
+    }
+    function formatDayFromTimestamp(ts) {
+        const d = new Date(ts * 1000);
+        return d.toLocaleDateString("en-US", { weekday: "long" });
+    }
+    function formatDateShort(ts) {
+        const d = new Date(ts * 1000);
+        return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    }
+
+    /* -- Normalize Data -- */
+    function normalizeMeteoSource(data) {
+        if (!data || !data.daily || !data.daily.data) return [];
+        return data.daily.data.slice(0, 5).map(day => ({
+            dateKey: day.day,
+            dayName: formatDay(day.day),
+            dateLabel: formatDate(day.day),
+            temp: day.all_day.temperature,
+            min: day.all_day.temperature_min,
+            max: day.all_day.temperature_max,
+            wind: day.all_day.wind.speed,
+            condition: day.summary,
+            conditionShort: day.all_day.weather || day.summary,
+            emoji: getEmoji(day.all_day.weather),
+            detail: day.summary
+        }));
+    }
+
+    function normalizeWeatherAPI(data) {
+        if (!data || !data.forecast || !data.forecast.forecastday) return [];
+        return data.forecast.forecastday.slice(0, 5).map(day => ({
+            dateKey: day.date,
+            dayName: formatDay(day.date),
+            dateLabel: formatDate(day.date),
+            temp: day.day.avgtemp_c,
+            min: day.day.mintemp_c,
+            max: day.day.maxtemp_c,
+            wind: day.day.maxwind_kph,
+            condition: day.day.condition.text,
+            conditionShort: day.day.condition.text,
+            emoji: getEmoji(day.day.condition.text),
+            detail: day.day.condition.text
+        }));
+    }
+
+    function normalizeOpenWeather(data) {
+        if (!data || !data.list) return [];
+        var byDay = {};
+        data.list.forEach(function(item) {
+            var dateKey = item.dt_txt ? item.dt_txt.split(" ")[0] : formatDateFromTimestamp(item.dt);
+            if (!byDay[dateKey]) byDay[dateKey] = [];
+            byDay[dateKey].push(item);
         });
 
+        return Object.entries(byDay).slice(0, 5).map(function(entry) {
+            var dateKey = entry[0];
+            var items = entry[1];
+            var noon = items.find(function(i) { return i.dt_txt && i.dt_txt.includes("12:00"); }) || items[0];
+            var allTemps = items.map(function(i) { return i.main.temp; });
+            var minT = Math.min.apply(null, allTemps);
+            var maxT = Math.max.apply(null, allTemps);
+            return {
+                dateKey: dateKey,
+                dayName: formatDay(dateKey),
+                dateLabel: formatDate(dateKey),
+                temp: noon.main.temp,
+                min: minT,
+                max: maxT,
+                wind: noon.wind.speed * 3.6,
+                condition: noon.weather[0].description,
+                conditionShort: noon.weather[0].description,
+                emoji: getEmoji(noon.weather[0].description),
+                detail: noon.weather[0].description
+            };
+        });
     }
 
+    /* -- Rendering -- */
+    function renderSourceCards(containerId, days) {
+        var container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = "";
 
-    async function setWeather(lat, long) {
-        const meteoWeatherAPIUrl = `https://www.meteosource.com/api/v1/free/point?lat=${lat}&lon=${long}&sections=current%2Cdaily&language=en&units=auto&key=b89qv8yczd4bhiz310mpgbafdygaz1wyfxjh4aff`;
-        //const meteoWeatherAPIUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${long}&appid=5f0af5bbd4a8259eeb3c759055346070&units=metric`;
-        await fetch(meteoWeatherAPIUrl)
-            .then (response =>{
-                return response.json();
-                // dummy data for testing below
-                //return JSON.parse("{\"lat\":\"43.70011N\",\"lon\":\"79.4163W\",\"elevation\":175,\"timezone\":\"EST\",\"units\":\"metric\",\"current\":{\"icon\":\"partly_sunny\",\"icon_num\":4,\"summary\":\"Partly sunny\",\"temperature\":6.0,\"wind\":{\"speed\":2.7,\"angle\":323,\"dir\":\"NW\"},\"precipitation\":{\"total\":0.0,\"type\":\"none\"},\"cloud_cover\":31},\"hourly\":{\"data\":[{\"date\":\"2023-03-21T10:00:00\",\"weather\":\"partly_sunny\",\"icon\":4,\"summary\":\"Partly sunny\",\"temperature\":6.0,\"wind\":{\"speed\":2.7,\"dir\":\"NW\",\"angle\":323},\"cloud_cover\":{\"total\":31},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-21T11:00:00\",\"weather\":\"partly_sunny\",\"icon\":4,\"summary\":\"Partly sunny\",\"temperature\":6.0,\"wind\":{\"speed\":2.2,\"dir\":\"NW\",\"angle\":321},\"cloud_cover\":{\"total\":39},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-21T12:00:00\",\"weather\":\"partly_sunny\",\"icon\":4,\"summary\":\"Partly sunny\",\"temperature\":5.8,\"wind\":{\"speed\":1.6,\"dir\":\"NW\",\"angle\":308},\"cloud_cover\":{\"total\":52},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-21T13:00:00\",\"weather\":\"cloudy\",\"icon\":6,\"summary\":\"Cloudy\",\"temperature\":7.2,\"wind\":{\"speed\":2.1,\"dir\":\"NW\",\"angle\":311},\"cloud_cover\":{\"total\":85},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-21T14:00:00\",\"weather\":\"overcast\",\"icon\":7,\"summary\":\"Overcast\",\"temperature\":7.5,\"wind\":{\"speed\":1.9,\"dir\":\"NNW\",\"angle\":336},\"cloud_cover\":{\"total\":99},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-21T15:00:00\",\"weather\":\"overcast\",\"icon\":7,\"summary\":\"Overcast\",\"temperature\":7.0,\"wind\":{\"speed\":1.1,\"dir\":\"N\",\"angle\":5},\"cloud_cover\":{\"total\":100},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-21T16:00:00\",\"weather\":\"overcast\",\"icon\":7,\"summary\":\"Overcast\",\"temperature\":7.0,\"wind\":{\"speed\":1.7,\"dir\":\"NNE\",\"angle\":33},\"cloud_cover\":{\"total\":100},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-21T17:00:00\",\"weather\":\"overcast\",\"icon\":7,\"summary\":\"Overcast\",\"temperature\":6.8,\"wind\":{\"speed\":2.4,\"dir\":\"NE\",\"angle\":47},\"cloud_cover\":{\"total\":100},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-21T18:00:00\",\"weather\":\"overcast\",\"icon\":7,\"summary\":\"Overcast\",\"temperature\":6.0,\"wind\":{\"speed\":2.7,\"dir\":\"ENE\",\"angle\":60},\"cloud_cover\":{\"total\":100},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-21T19:00:00\",\"weather\":\"overcast\",\"icon\":7,\"summary\":\"Overcast\",\"temperature\":5.2,\"wind\":{\"speed\":2.5,\"dir\":\"ENE\",\"angle\":65},\"cloud_cover\":{\"total\":100},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-21T20:00:00\",\"weather\":\"overcast\",\"icon\":7,\"summary\":\"Overcast\",\"temperature\":4.2,\"wind\":{\"speed\":2.3,\"dir\":\"ENE\",\"angle\":74},\"cloud_cover\":{\"total\":100},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-21T21:00:00\",\"weather\":\"overcast\",\"icon\":7,\"summary\":\"Overcast\",\"temperature\":3.5,\"wind\":{\"speed\":2.1,\"dir\":\"E\",\"angle\":81},\"cloud_cover\":{\"total\":100},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-21T22:00:00\",\"weather\":\"overcast\",\"icon\":7,\"summary\":\"Overcast\",\"temperature\":3.0,\"wind\":{\"speed\":2.1,\"dir\":\"E\",\"angle\":95},\"cloud_cover\":{\"total\":100},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-21T23:00:00\",\"weather\":\"overcast\",\"icon\":7,\"summary\":\"Overcast\",\"temperature\":2.8,\"wind\":{\"speed\":2.3,\"dir\":\"E\",\"angle\":94},\"cloud_cover\":{\"total\":100},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-22T00:00:00\",\"weather\":\"overcast\",\"icon\":7,\"summary\":\"Overcast\",\"temperature\":2.2,\"wind\":{\"speed\":2.3,\"dir\":\"E\",\"angle\":91},\"cloud_cover\":{\"total\":93},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-22T01:00:00\",\"weather\":\"overcast\",\"icon\":7,\"summary\":\"Overcast\",\"temperature\":2.0,\"wind\":{\"speed\":2.5,\"dir\":\"E\",\"angle\":84},\"cloud_cover\":{\"total\":91},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-22T02:00:00\",\"weather\":\"overcast\",\"icon\":7,\"summary\":\"Overcast\",\"temperature\":1.8,\"wind\":{\"speed\":2.6,\"dir\":\"ESE\",\"angle\":104},\"cloud_cover\":{\"total\":95},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-22T03:00:00\",\"weather\":\"mostly_cloudy\",\"icon\":29,\"summary\":\"Mostly cloudy\",\"temperature\":1.5,\"wind\":{\"speed\":2.9,\"dir\":\"ESE\",\"angle\":102},\"cloud_cover\":{\"total\":79},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-22T04:00:00\",\"weather\":\"cloudy\",\"icon\":30,\"summary\":\"Cloudy\",\"temperature\":1.2,\"wind\":{\"speed\":3.1,\"dir\":\"ESE\",\"angle\":102},\"cloud_cover\":{\"total\":86},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-22T05:00:00\",\"weather\":\"cloudy\",\"icon\":30,\"summary\":\"Cloudy\",\"temperature\":1.0,\"wind\":{\"speed\":3.3,\"dir\":\"ESE\",\"angle\":103},\"cloud_cover\":{\"total\":84},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-22T06:00:00\",\"weather\":\"cloudy\",\"icon\":6,\"summary\":\"Cloudy\",\"temperature\":0.8,\"wind\":{\"speed\":3.4,\"dir\":\"ESE\",\"angle\":110},\"cloud_cover\":{\"total\":84},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-22T07:00:00\",\"weather\":\"cloudy\",\"icon\":6,\"summary\":\"Cloudy\",\"temperature\":0.8,\"wind\":{\"speed\":3.8,\"dir\":\"ESE\",\"angle\":104},\"cloud_cover\":{\"total\":90},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-22T08:00:00\",\"weather\":\"cloudy\",\"icon\":6,\"summary\":\"Cloudy\",\"temperature\":1.5,\"wind\":{\"speed\":4.0,\"dir\":\"E\",\"angle\":97},\"cloud_cover\":{\"total\":84},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},{\"date\":\"2023-03-22T09:00:00\",\"weather\":\"overcast\",\"icon\":7,\"summary\":\"Overcast\",\"temperature\":2.5,\"wind\":{\"speed\":3.4,\"dir\":\"E\",\"angle\":91},\"cloud_cover\":{\"total\":100},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}}]},\"daily\":{\"data\":[{\"day\":\"2023-03-21\",\"weather\":\"mostly_cloudy\",\"icon\":5,\"summary\":\"Partly sunny changing to cloudy by afternoon and evening. Temperature 3/8 °C.\",\"all_day\":{\"weather\":\"mostly_cloudy\",\"icon\":5,\"temperature\":5.2,\"temperature_min\":3.0,\"temperature_max\":7.5,\"wind\":{\"speed\":2.9,\"dir\":\"WNW\",\"angle\":286},\"cloud_cover\":{\"total\":84},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},\"morning\":null,\"afternoon\":null,\"evening\":null},{\"day\":\"2023-03-22\",\"weather\":\"overcast\",\"icon\":7,\"summary\":\"Cloudy. Temperature 1/5 °C.\",\"all_day\":{\"weather\":\"overcast\",\"icon\":7,\"temperature\":3.2,\"temperature_min\":0.8,\"temperature_max\":5.2,\"wind\":{\"speed\":3.4,\"dir\":\"SE\",\"angle\":134},\"cloud_cover\":{\"total\":95},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},\"morning\":null,\"afternoon\":null,\"evening\":null},{\"day\":\"2023-03-23\",\"weather\":\"light_rain\",\"icon\":10,\"summary\":\"Light rain changing to cloudy by evening. Temperature 3/8 °C.\",\"all_day\":{\"weather\":\"light_rain\",\"icon\":10,\"temperature\":5.8,\"temperature_min\":2.5,\"temperature_max\":8.0,\"wind\":{\"speed\":2.6,\"dir\":\"WNW\",\"angle\":283},\"cloud_cover\":{\"total\":98},\"precipitation\":{\"total\":10.2,\"type\":\"rain\"}},\"morning\":null,\"afternoon\":null,\"evening\":null},{\"day\":\"2023-03-24\",\"weather\":\"mostly_cloudy\",\"icon\":5,\"summary\":\"Partly sunny changing to cloudy by evening. Temperature -1/6 °C.\",\"all_day\":{\"weather\":\"mostly_cloudy\",\"icon\":5,\"temperature\":2.2,\"temperature_min\":-0.8,\"temperature_max\":6.2,\"wind\":{\"speed\":2.4,\"dir\":\"NNE\",\"angle\":24},\"cloud_cover\":{\"total\":77},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},\"morning\":null,\"afternoon\":null,\"evening\":null},{\"day\":\"2023-03-25\",\"weather\":\"rain\",\"icon\":11,\"summary\":\"Rain, reducing in the evening. Temperature 0/2 °C. Wind from NE.\",\"all_day\":{\"weather\":\"rain\",\"icon\":11,\"temperature\":1.0,\"temperature_min\":0.2,\"temperature_max\":1.8,\"wind\":{\"speed\":5.6,\"dir\":\"ENE\",\"angle\":76},\"cloud_cover\":{\"total\":100},\"precipitation\":{\"total\":31.1,\"type\":\"rain\"}},\"morning\":null,\"afternoon\":null,\"evening\":null},{\"day\":\"2023-03-26\",\"weather\":\"partly_sunny\",\"icon\":4,\"summary\":\"Partly sunny. Temperature rising to 7 °C. Wind from NW in the afternoon.\",\"all_day\":{\"weather\":\"partly_sunny\",\"icon\":4,\"temperature\":3.0,\"temperature_min\":0.2,\"temperature_max\":6.8,\"wind\":{\"speed\":4.9,\"dir\":\"WNW\",\"angle\":288},\"cloud_cover\":{\"total\":58},\"precipitation\":{\"total\":0.0,\"type\":\"none\"}},\"morning\":null,\"afternoon\":null,\"evening\":null},{\"day\":\"2023-03-27\",\"weather\":\"psbl_snow\",\"icon\":18,\"summary\":\"Mostly cloudy changing to rain in the afternoon. Temperature 0/3 °C.\",\"all_day\":{\"weather\":\"psbl_snow\",\"icon\":18,\"temperature\":1.5,\"temperature_min\":0.2,\"temperature_max\":3.2,\"wind\":{\"speed\":2.6,\"dir\":\"ENE\",\"angle\":69},\"cloud_cover\":{\"total\":76},\"precipitation\":{\"total\":11.8,\"type\":\"snow\"}},\"morning\":null,\"afternoon\":null,\"evening\":null}]}}");
-            })
-            .then(geolocationData => {
-                console.log(geolocationData);
-                // Display the forecast for the next 7 days
-                const forecast = geolocationData.daily.data.slice(0, 5); // Get the forecast for every 24 hours
-                const forecastTable = document.getElementById('forecast-table-meteosource');
-                const unit = geolocationData.units === "us" ? "F" : "C";
+        if (!days || days.length === 0) {
+            container.innerHTML = '<div class="forecast-card"><p style="color:var(--text-muted);grid-column:1/-1;text-align:center;">No data available</p></div>';
+            return;
+        }
 
-                forecast.forEach(day => {
-                    //const date = day.day;
-                    const date = convertDate(day.day);
-                    const temperature = `${day.all_day.temperature.toFixed(0)}&deg;` + unit;
-                    const maxTemp = day.all_day.temperature_max.toFixed(0);
-                    const minTemp = day.all_day.temperature_min.toFixed(0);
-                    const minMaxTemp = minTemp + " to " + maxTemp + "&deg;" + unit;
-                    const windSpeed = `${day.all_day.wind.speed} km/hr`;
-                    const weather = day.summary;
-                    const iconID= "icon" + i;
-                    const row = `<tr><td>${date}</td><td>${temperature}</td><td>${minMaxTemp}</td><td>${windSpeed}</td><td><canvas id="${iconID}" class="icon" width="20" height="20"></canvas></td><td>${weather}</td></tr>`;
-                    forecastTable.insertAdjacentHTML('beforeend', row);
-                    addWeatherIcon(iconID, day.weather);
-                    i++;
-                });
-            });
+        days.forEach(function(day) {
+            var card = document.createElement("div");
+            card.className = "forecast-card";
+            var windSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>';
+            var detailHtml = (day.detail && day.detail !== day.conditionShort) ? '<div class="fc-detail">' + day.detail + '</div>' : '';
+            card.innerHTML = '<div class="fc-left">' +
+                '<div class="fc-day">' + day.dayName + '</div>' +
+                '<div class="fc-date">' + day.dateLabel + '</div>' +
+                '</div>' +
+                '<div class="fc-center">' +
+                '<div class="fc-icon">' + day.emoji + '</div>' +
+                '<div class="fc-condition">' + day.conditionShort + '</div>' +
+                '</div>' +
+                '<div class="fc-right">' +
+                '<div class="fc-temp">' + tempDisplay(day.temp) + '</div>' +
+                '<div class="fc-range">' + tempDisplay(day.min) + ' / ' + tempDisplay(day.max) + '</div>' +
+                '<div class="fc-wind">' + windSvg + ' ' + day.wind.toFixed(1) + ' km/h</div>' +
+                '</div>' + detailHtml;
+            container.appendChild(card);
+        });
+    }
 
+    function renderComparison() {
+        var container = document.getElementById("comparison-container");
+        if (!container) return;
+        container.innerHTML = "";
 
-        const locationAPIUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${long}&localityLanguage=en`;
-        fetch(locationAPIUrl)
-            .then(response => {
-                return response.json();
-            })
-            .then(weatherData => {
-                let locationData ;
-                if(weatherData.principalSubdivision.length === 0) {
-                    locationData = weatherData.city + ", " + weatherData.countryName;
-                } else {
-                    locationData= weatherData.city + ", " + weatherData.principalSubdivision;
+        var meteo = forecastData.meteosource || [];
+        var wapi = forecastData.weatherapi || [];
+        var ow = forecastData.openweather || [];
+
+        var allDates = new Map();
+        [meteo, wapi, ow].forEach(function(src) {
+            src.forEach(function(d) {
+                if (!allDates.has(d.dateKey)) {
+                    allDates.set(d.dateKey, { dayName: d.dayName, dateLabel: d.dateLabel });
                 }
-
-                const openWeatherAPIUrl = `https://api.openweathermap.org/data/2.5/forecast?q=${locationData}&units=metric&appid=5f0af5bbd4a8259eeb3c759055346070`;
-                fetch(openWeatherAPIUrl)
-                    .then(response => response.json())
-                    .then(geolocationData => {
-                        console.log(geolocationData);
-                        // Display the forecast for the next 7 days
-                        const forecast = geolocationData.list.filter((item, index) => index % 8 === 0); // Get the forecast for every 24 hours
-                        const forecastTable = document.getElementById('forecast-table-open');
-                        forecast.forEach(day => {
-                            const date = new Date(day.dt * 1000).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-                            const temperature = `${day.main.temp.toFixed(0)}&deg;C`;
-                            const maxTemp = day.main.temp_max.toFixed(0);
-                            const minTemp = day.main.temp_min.toFixed(0);
-                            const minMaxTemp = minTemp + " to " + maxTemp + "&deg;C";
-                            const windSpeed = `${day.wind.speed} km/hr`;
-                            const weather = day.weather[0].description;
-                            const iconID= "icon" + i;
-                            const row = `<tr><td>${date}</td><td>${temperature}</td><td>${minMaxTemp}</td><td>${windSpeed}</td><td><canvas id="${iconID}" class="icon" width="20" height="20"></canvas></td><td>${weather}</td></tr>`;
-                            forecastTable.insertAdjacentHTML('beforeend', row);
-                            addWeatherIcon(iconID, weather);
-                            i++;
-                        });
-                    })
-                    .catch(error => console.error(error));
             });
-
-        const weatherAPIURL = `https://api.weatherapi.com/v1/forecast.json?key=52c5ddc336f14e3299d13034232603&q=${lat},${long}&days=5&aqi=no&alerts=yes`;
-        fetch(weatherAPIURL)
-            .then(response => response.json())
-            .then(weatherAPIData => {
-                console.log(weatherAPIData);
-                // Display the forecast for the next 7 days
-                const forecast = weatherAPIData.forecast.forecastday.slice(0, 5) // Get the forecast for every 24 hours
-                const forecastTable = document.getElementById('forecast-table-weatherapi');
-                forecast.forEach(day => {
-                    const date = convertDate(day.date);
-                    const temperature = `${day.day.avgtemp_c.toFixed(0)}&deg;C`;
-                    const maxTemp = day.day.maxtemp_c.toFixed(0);
-                    const minTemp = day.day.mintemp_c.toFixed(0);
-                    const minMaxTemp = minTemp + " to " + maxTemp + "&deg;C";
-                    const windSpeed = `${day.day.maxwind_kph} km/hr`;
-                    const weather = day.day.condition.text;
-                    const iconID= "icon" + i;
-                    const row = `<tr><td>${date}</td><td>${temperature}</td><td>${minMaxTemp}</td><td>${windSpeed}</td><td><canvas id="${iconID}" class="icon" width="20" height="20"></canvas></td><td>${weather}</td></tr>`;
-                    forecastTable.insertAdjacentHTML('beforeend', row);
-                    addWeatherIcon(iconID, weather);
-                    i++;
-                });
-            //.catch(error => console.error(error));
         });
 
+        var sorted = Array.from(allDates.entries()).sort(function(a, b) { return a[0].localeCompare(b[0]); });
 
+        if (sorted.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px 0;">No forecast data available</p>';
+            return;
+        }
+
+        sorted.forEach(function(entry) {
+            var dateKey = entry[0];
+            var info = entry[1];
+            var mDay = meteo.find(function(d) { return d.dateKey === dateKey; });
+            var wDay = wapi.find(function(d) { return d.dateKey === dateKey; });
+            var oDay = ow.find(function(d) { return d.dateKey === dateKey; });
+
+            var block = document.createElement("div");
+            block.className = "comparison-day";
+            block.innerHTML = '<div class="comparison-day-header">' +
+                info.dayName + ' <span class="date-sub">' + info.dateLabel + '</span></div>' +
+                '<div class="comparison-sources">' +
+                renderComparisonSource("MeteoSource", mDay) +
+                renderComparisonSource("WeatherAPI", wDay) +
+                renderComparisonSource("OpenWeather", oDay) +
+                '</div>';
+            container.appendChild(block);
+        });
     }
 
-
-    function addWeatherIcon(iconID, iconDescData){
-        // console.log("iconID", iconID)
-        // console.log("iconDescData", iconDescData)
-        const skycons = new Skycons({"color": "white"});
-        let iconMapDay = {
-            /** Meteosource */
-            'sunny': Skycons.CLEAR_DAY,
-            'mostly_sunny': Skycons.PARTLY_CLOUDY_DAY,
-            'partly_sunny': Skycons.PARTLY_CLOUDY_DAY,
-            'mostly_cloudy': Skycons.PARTLY_CLOUDY_DAY,
-            'cloudy': Skycons.CLOUDY,
-            'overcast': Skycons.CLOUDY,
-            'overcast_with_low_clouds': Skycons.CLOUDY,
-            'fog': Skycons.FOG,
-            'light_rain': Skycons.SHOWERS_DAY,
-            'rain': Skycons.RAIN,
-            'psbl_rain': Skycons.RAIN,
-            'rain_shower': Skycons.SHOWERS_DAY,
-            'tstorm': Skycons.THUNDER_RAIN,
-            'tstorm_shower': Skycons.THUNDER_RAIN,
-            'thunderstorm': Skycons.THUNDER_RAIN,
-            'local_thunderstorms': Skycons.THUNDER_SHOWERS_DAY,
-            'light_snow': Skycons.SNOW,
-            'snow': Skycons.SNOW,
-            'psbl_snow': Skycons.SNOW,
-            'snow_shower': Skycons.SNOW_SHOWERS_DAY,
-            'rain_and_snow': Skycons.SNOW_SHOWERS_DAY,
-            'psbl_rain_and_snow': Skycons.SNOW_SHOWERS_DAY,
-            'freezing_rain': Skycons.SNOW_SHOWERS_DAY,
-            'psbl_fr_rain': Skycons.SNOW_SHOWERS_DAY,
-            'hail': Skycons.HAIL,
-            'clear_(night)': Skycons.CLEAR_NIGHT,
-            'mostly_clear_(night)': Skycons.PARTLY_CLOUDY_NIGHT,
-            'partly_clear_(night)': Skycons.PARTLY_CLOUDY_NIGHT,
-            'cloudy_(night)': Skycons.PARTLY_CLOUDY_NIGHT,
-            'overcast_with_low_clouds_(night)': Skycons.CLOUDY,
-            'rain_shower_(night)': Skycons.SHOWERS_NIGHT,
-            'local_thunderstorms_(night)': Skycons.THUNDER_SHOWERS_NIGHT,
-            'snow_shower_(night)': Skycons.SNOW_SHOWERS_NIGHT,
-            'rain_and_snow_(night)': Skycons.RAIN_SNOW_SHOWERS_NIGHT,
-            'psbl_freezing_rain_(night)': Skycons.SNOW_SHOWERS_NIGHT,
-
-            /** Open Weather */
-            'clear sky': Skycons.CLEAR_DAY,
-            'few clouds': Skycons.PARTLY_CLOUDY_DAY,
-            'scattered clouds': Skycons.PARTLY_CLOUDY_DAY,
-            'broken clouds': Skycons.PARTLY_CLOUDY_DAY,
-            'overcast clouds': Skycons.CLOUDY,
-            'light intensity drizzle rain': Skycons.SHOWERS_NIGHT,
-            'light rain': Skycons.SHOWERS_DAY,
-            'moderate rain': Skycons.RAIN,
-            'heavy intensity rain': Skycons.RAIN,
-            'very heavy rain': Skycons.RAIN,
-            'extreme rain': Skycons.RAIN,
-            'freezing rain': Skycons.RAIN,
-            'light intensity shower rain': Skycons.SHOWERS_DAY,
-            'shower rain': Skycons.SHOWERS_DAY,
-            'heavy intensity shower rain': Skycons.RAIN,
-            'light snow': Skycons.SNOW_SHOWERS_DAY,
-            //'snow': Skycons.SNOW,
-            'heavy snow': Skycons.SNOW,
-            'sleet': Skycons.SLEET,
-            'shower sleet': Skycons.SLEET,
-            'light rain and snow': Skycons.RAIN_SNOW_SHOWERS_DAY,
-            'rain and snow': Skycons.RAIN_SNOW,
-            'light shower snow': Skycons.SNOW_SHOWERS_DAY,
-            'shower snow': Skycons.RAIN_SNOW,
-            'heavy shower snow': Skycons.RAIN_SNOW,
-            'haze': Skycons.FOG,
-            //'fog': Skycons.FOG,
-            'mist': Skycons.FOG,
-            'smoke': Skycons.FOG,
-
-            /** Weather API */
-            'Sunny': Skycons.CLEAR_DAY,
-            'Partly cloudy': Skycons.PARTLY_CLOUDY_DAY,
-            'Cloudy': Skycons.CLOUDY,
-            'Overcast': Skycons.CLOUDY,
-            'Patchy rain possible': Skycons.SHOWERS_DAY,
-            'Patchy snow possible': Skycons.SNOW_SHOWERS_DAY,
-            'Sleet': Skycons.SLEET,
-            'Patchy freezing drizzle possible': Skycons.SHOWERS_DAY,
-            'Thundery outbreaks possible': Skycons.THUNDER_SHOWERS_DAY,
-            'Blowing snow': Skycons.SNOW,
-            'Blizzard': Skycons.SNOW,
-            'Fog': Skycons.FOG,
-            'Freezing fog': Skycons.FOG,
-            'Mist': Skycons.FOG,
-            'Patchy light drizzle': Skycons.SHOWERS_DAY,
-            'Light drizzle': Skycons.SHOWERS_DAY,
-            'Freezing drizzle': Skycons.SHOWERS_DAY,
-            'Heavy freezing drizzle': Skycons.SHOWERS_DAY,
-            'Patchy light rain': Skycons.SHOWERS_DAY,
-            'Light rain': Skycons.SHOWERS_DAY,
-            'Moderate rain at times': Skycons.SHOWERS_DAY,
-            'Moderate rain': Skycons.RAIN,
-            'Heavy rain at times': Skycons.RAIN,
-            'Heavy rain': Skycons.RAIN,
-            'Light freezing rain': Skycons.SHOWERS_DAY,
-            'Moderate or heavy freezing rain': Skycons.RAIN,
-            'Light sleet': Skycons.SLEET,
-            'Moderate or heavy sleet': Skycons.SLEET,
-            'Patchy light snow': Skycons.SNOW_SHOWERS_DAY,
-            'Light snow': Skycons.SNOW_SHOWERS_DAY,
-            'Patchy moderate snow': Skycons.SNOW,
-            'Moderate snow': Skycons.SNOW,
-            'Patchy heavy snow': Skycons.SNOW,
-            'Heavy snow': Skycons.SNOW,
-            'Ice pellets': Skycons.SNOW,
-            'Light rain shower': Skycons.SHOWERS_DAY,
-            'Moderate or heavy rain shower': Skycons.RAIN,
-            'Torrential rain shower': Skycons.RAIN,
-            'Light sleet showers': Skycons.RAIN_SNOW_SHOWERS_DAY,
-            'Moderate or heavy sleet showers': Skycons.SNOW_SHOWERS_DAY,
-            'Light snow showers': Skycons.SNOW_SHOWERS_DAY,
-            'Moderate or heavy snow showers': Skycons.RAIN_SNOW,
-            'Light showers of ice pellets': Skycons.RAIN_SNOW,
-            'Moderate or heavy showers of ice pellets': Skycons.RAIN_SNOW,
-            'Patchy light rain with thunder': Skycons.THUNDER_SHOWERS_DAY,
-            'Moderate or heavy rain with thunder': Skycons.THUNDER_RAIN,
-            'Patchy light snow with thunder': Skycons.THUNDER_SHOWERS_DAY,
-            'Moderate or heavy snow with thunder': Skycons.THUNDER_SHOWERS_DAY,
-
-            'default': Skycons.CLEAR_DAY
-        };
-
-        skycons.set(iconID, iconMapDay[iconDescData]);
-        skycons.play();
+    function renderComparisonSource(name, day) {
+        if (!day) {
+            return '<div class="cs-unavailable"><span>' + name + ': N/A</span></div>';
+        }
+        return '<div class="comparison-source">' +
+            '<div class="cs-name">' + name + '</div>' +
+            '<div class="cs-temp-row"><span class="cs-icon">' + day.emoji + '</span><span class="cs-temp">' + tempDisplay(day.temp) + '</span></div>' +
+            '<div class="cs-range">' + tempDisplay(day.min) + ' – ' + tempDisplay(day.max) + '</div>' +
+            '<div class="cs-condition">' + day.conditionShort + '</div>' +
+            '<div class="cs-wind">Wind: ' + day.wind.toFixed(1) + ' km/h</div>' +
+            '</div>';
     }
 
+    function renderAll() {
+        forecastData.meteosource = normalizeMeteoSource(window.__rawMeteo);
+        forecastData.weatherapi = normalizeWeatherAPI(window.__rawWeatherAPI);
+        forecastData.openweather = normalizeOpenWeather(window.__rawOpenWeather);
 
-    function setLocation(lat, long, location) {
-        // Get the user's location using the Geolocation API
-        const locationAPIUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${long}&localityLanguage=en`;
-        fetch(locationAPIUrl)
-            .then(response => {
-                return response.json();
-            })
-            .then(weatherData => {
-                if(weatherData.principalSubdivision.length === 0) {
-                    location.textContent = weatherData.city + ", " + weatherData.countryName;
+        renderSourceCards("meteosource-cards", forecastData.meteosource);
+        renderSourceCards("weatherapi-cards", forecastData.weatherapi);
+        renderSourceCards("openweather-cards", forecastData.openweather);
+        renderComparison();
+    }
+
+    /* -- Tab Switching -- */
+    document.querySelectorAll(".tab-btn").forEach(function(btn) {
+        btn.addEventListener("click", function() {
+            document.querySelectorAll(".tab-btn").forEach(function(b) { b.classList.remove("active"); });
+            btn.classList.add("active");
+            document.querySelectorAll(".forecast-view").forEach(function(v) { v.classList.remove("active"); });
+            var target = document.getElementById("view-" + btn.dataset.source);
+            if (target) target.classList.add("active");
+        });
+    });
+
+    /* -- Unit Toggle -- */
+    elUnitToggle.addEventListener("click", function() {
+        useCelsius = !useCelsius;
+        elUnitToggle.textContent = useCelsius ? "°C" : "°F";
+        renderAll();
+    });
+
+    /* -- Date/Time -- */
+    function updateDateTime() {
+        if (elDateTime) {
+            var now = new Date();
+            elDateTime.textContent = now.toLocaleString("en-US", {
+                weekday: "short", year: "numeric", month: "short", day: "numeric",
+                hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short"
+            });
+        }
+    }
+    updateDateTime();
+    setInterval(updateDateTime, 1000);
+
+    /* -- Data Fetching -- */
+    var fetchCount = 0;
+    var TOTAL_FETCHES = 3;
+
+    function checkAllLoaded() {
+        fetchCount++;
+        if (fetchCount >= TOTAL_FETCHES) {
+            renderAll();
+            elLoading.classList.add("hidden");
+            elMain.style.display = "block";
+        }
+    }
+
+    async function fetchForecasts(lat, lon) {
+        /* MeteoSource */
+        var meteoUrl = "https://www.meteosource.com/api/v1/free/point?lat=" + lat + "&lon=" + lon + "&sections=daily&language=en&key=" + METEO_KEY;
+        fetch(meteoUrl)
+            .then(function(r) { return r.json(); })
+            .then(function(data) { window.__rawMeteo = data; })
+            .catch(function(err) { console.error("MeteoSource error:", err); window.__rawMeteo = null; })
+            .finally(checkAllLoaded);
+
+        /* WeatherAPI */
+        var wapiUrl = "https://api.weatherapi.com/v1/forecast.json?key=" + WEATHER_API_KEY + "&q=" + lat + "," + lon + "&days=5&aqi=no&alerts=no";
+        fetch(wapiUrl)
+            .then(function(r) { return r.json(); })
+            .then(function(data) { window.__rawWeatherAPI = data; })
+            .catch(function(err) { console.error("WeatherAPI error:", err); window.__rawWeatherAPI = null; })
+            .finally(checkAllLoaded);
+
+        /* OpenWeather */
+        var owUrl = "https://api.openweathermap.org/data/2.5/forecast?lat=" + lat + "&lon=" + lon + "&appid=" + OPEN_WEATHER_KEY + "&units=metric";
+        fetch(owUrl)
+            .then(function(r) { return r.json(); })
+            .then(function(data) { window.__rawOpenWeather = data; })
+            .catch(function(err) { console.error("OpenWeather error:", err); window.__rawOpenWeather = null; })
+            .finally(checkAllLoaded);
+    }
+
+    /* -- Location -- */
+    function setLocation(lat, lon) {
+        var locUrl = "https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=" + lat + "&longitude=" + lon + "&localityLanguage=en";
+        fetch(locUrl)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.principalSubdivision) {
+                    locationName = data.city + ", " + data.principalSubdivision;
                 } else {
-                    location.textContent = weatherData.city + ", " + weatherData.principalSubdivision;
+                    locationName = data.city + ", " + data.countryName;
                 }
+                if (elLocation) elLocation.textContent = locationName;
+            })
+            .catch(function() {
+                if (elLocation) elLocation.textContent = "Unknown Location";
             });
     }
 
-    function getCurrentDate() {
-        return new Date();
+    /* -- Init -- */
+    function init() {
+        if (navigator.geolocation) {
+            var geoTimer = setTimeout(function() {
+                console.log("Geolocation timeout, using default");
+                startWithCoords(DEFAULT_LAT, DEFAULT_LON);
+            }, GEO_TIMEOUT);
+
+            navigator.geolocation.getCurrentPosition(
+                function(pos) {
+                    clearTimeout(geoTimer);
+                    startWithCoords(pos.coords.latitude, pos.coords.longitude);
+                },
+                function() {
+                    clearTimeout(geoTimer);
+                    startWithCoords(DEFAULT_LAT, DEFAULT_LON);
+                },
+                { timeout: GEO_TIMEOUT }
+            );
+        } else {
+            startWithCoords(DEFAULT_LAT, DEFAULT_LON);
+        }
     }
 
-    function convertDate(date) {
-        var dateToken = date.split("-");
-        var newDate = new Date(dateToken[0], parseInt(dateToken[1])-1, dateToken[2]);
-        return moment(newDate).format('dddd, MMMM D');
+    function startWithCoords(lat, lon) {
+        setLocation(lat, lon);
+        fetchForecasts(lat, lon);
     }
 
-});
+    init();
+})();
