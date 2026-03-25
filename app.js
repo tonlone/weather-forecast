@@ -1,7 +1,7 @@
 "use strict";
 
 (function () {
-    /* ââ Config ââ */
+    /* ── Config ── */
     const METEO_KEY = "b89qv8yczd4bhiz310mpgbafdygaz1wyfxjh4aff";
     const WEATHER_API_KEY = "52c5ddc336f14e3299d13034232603";
     const OPEN_WEATHER_KEY = "5f0af5bbd4a8259eeb3c759055346070";
@@ -10,12 +10,12 @@
     const DEFAULT_LON = -79.4403;
     const GEO_TIMEOUT = 10000;
 
-    /* ââ State ââ */
+    /* ── State ── */
     let useCelsius = true;
     let forecastData = { meteosource: null, weatherapi: null, openweather: null };
     let locationName = "";
 
-    /* ââ DOM refs ââ */
+    /* ── DOM refs ── */
     const $ = (s) => document.querySelector(s);
     const elLoading = $("#loading-overlay");
     const elError = $("#error-message");
@@ -25,64 +25,64 @@
     const elLocation = $("#location-name");
     const elDateTime = $("#current-datetime");
 
-    /* ââ Weather Emoji Map ââ */
+    /* ── Weather Emoji Map ── */
     const weatherEmojis = {
         /* MeteoSource */
-        'sunny': 'âï¸', 'mostly_sunny': 'ð¤ï¸', 'partly_sunny': 'â', 'mostly_cloudy': 'ð¥ï¸',
-        'cloudy': 'âï¸', 'overcast': 'âï¸', 'overcast_with_low_clouds': 'âï¸',
-        'fog': 'ð«ï¸', 'light_rain': 'ð¦ï¸', 'rain': 'ð§ï¸', 'psbl_rain': 'ð§ï¸',
-        'rain_shower': 'ð¦ï¸', 'tstorm': 'âï¸', 'tstorm_shower': 'âï¸',
-        'thunderstorm': 'âï¸', 'local_thunderstorms': 'âï¸',
-        'light_snow': 'ð¨ï¸', 'snow': 'âï¸', 'psbl_snow': 'âï¸',
-        'snow_shower': 'ð¨ï¸', 'rain_and_snow': 'ð¨ï¸', 'psbl_rain_and_snow': 'ð¨ï¸',
-        'freezing_rain': 'ð¨ï¸', 'psbl_fr_rain': 'ð¨ï¸', 'hail': 'ð§',
-        'clear_(night)': 'ð', 'mostly_clear_(night)': 'ð', 'partly_clear_(night)': 'ð',
-        'cloudy_(night)': 'âï¸', 'overcast_with_low_clouds_(night)': 'âï¸',
-        'rain_shower_(night)': 'ð§ï¸', 'local_thunderstorms_(night)': 'âï¸',
-        'snow_shower_(night)': 'ð¨ï¸', 'rain_and_snow_(night)': 'ð¨ï¸',
-        'psbl_freezing_rain_(night)': 'ð¨ï¸',
+        'sunny': '☀️', 'mostly_sunny': '🌤️', 'partly_sunny': '⛅', 'mostly_cloudy': '🌥️',
+        'cloudy': '☁️', 'overcast': '☁️', 'overcast_with_low_clouds': '☁️',
+        'fog': '🌫️', 'light_rain': '🌦️', 'rain': '🌧️', 'psbl_rain': '🌧️',
+        'rain_shower': '🌦️', 'tstorm': '⛈️', 'tstorm_shower': '⛈️',
+        'thunderstorm': '⛈️', 'local_thunderstorms': '⛈️',
+        'light_snow': '🌨️', 'snow': '❄️', 'psbl_snow': '❄️',
+        'snow_shower': '🌨️', 'rain_and_snow': '🌨️', 'psbl_rain_and_snow': '🌨️',
+        'freezing_rain': '🌨️', 'psbl_fr_rain': '🌨️', 'hail': '🧊',
+        'clear_(night)': '🌙', 'mostly_clear_(night)': '🌙', 'partly_clear_(night)': '🌙',
+        'cloudy_(night)': '☁️', 'overcast_with_low_clouds_(night)': '☁️',
+        'rain_shower_(night)': '🌧️', 'local_thunderstorms_(night)': '⛈️',
+        'snow_shower_(night)': '🌨️', 'rain_and_snow_(night)': '🌨️',
+        'psbl_freezing_rain_(night)': '🌨️',
 
         /* Open Weather */
-        'clear sky': 'âï¸', 'few clouds': 'ð¤ï¸', 'scattered clouds': 'â',
-        'broken clouds': 'ð¥ï¸', 'overcast clouds': 'âï¸',
-        'light rain': 'ð¦ï¸', 'moderate rain': 'ð§ï¸', 'heavy intensity rain': 'ð§ï¸',
-        'very heavy rain': 'ð§ï¸', 'extreme rain': 'ð§ï¸', 'freezing rain': 'ð¨ï¸',
-        'light intensity shower rain': 'ð¦ï¸', 'shower rain': 'ð§ï¸',
-        'heavy intensity shower rain': 'ð§ï¸', 'ragged shower rain': 'ð§ï¸',
-        'light snow': 'ð¨ï¸', 'snow': 'âï¸', 'heavy snow': 'âï¸',
-        'sleet': 'ð¨ï¸', 'shower sleet': 'ð¨ï¸',
-        'light rain and snow': 'ð¨ï¸', 'rain and snow': 'ð¨ï¸',
-        'light shower snow': 'ð¨ï¸', 'shower snow': 'ð¨ï¸', 'heavy shower snow': 'ð¨ï¸',
-        'thunderstorm': 'âï¸', 'thunderstorm with light rain': 'âï¸',
-        'thunderstorm with rain': 'âï¸', 'thunderstorm with heavy rain': 'âï¸',
-        'haze': 'ð«ï¸', 'mist': 'ð«ï¸', 'smoke': 'ð«ï¸', 'fog': 'ð«ï¸',
+        'clear sky': '☀️', 'few clouds': '🌤️', 'scattered clouds': '⛅',
+        'broken clouds': '🌥️', 'overcast clouds': '☁️',
+        'light rain': '🌦️', 'moderate rain': '🌧️', 'heavy intensity rain': '🌧️',
+        'very heavy rain': '🌧️', 'extreme rain': '🌧️', 'freezing rain': '🌨️',
+        'light intensity shower rain': '🌦️', 'shower rain': '🌧️',
+        'heavy intensity shower rain': '🌧️', 'ragged shower rain': '🌧️',
+        'light snow': '🌨️', 'snow': '❄️', 'heavy snow': '❄️',
+        'sleet': '🌨️', 'shower sleet': '🌨️',
+        'light rain and snow': '🌨️', 'rain and snow': '🌨️',
+        'light shower snow': '🌨️', 'shower snow': '🌨️', 'heavy shower snow': '🌨️',
+        'thunderstorm': '⛈️', 'thunderstorm with light rain': '⛈️',
+        'thunderstorm with rain': '⛈️', 'thunderstorm with heavy rain': '⛈️',
+        'haze': '🌫️', 'mist': '🌫️', 'smoke': '🌫️', 'fog': '🌫️',
 
         /* WeatherAPI */
-        'Sunny': 'âï¸', 'Clear': 'ð', 'Partly cloudy': 'â', 'Cloudy': 'ð¥ï¸',
-        'Overcast': 'âï¸', 'Mist': 'ð«ï¸', 'Fog': 'ð«ï¸', 'Freezing fog': 'ð«ï¸',
-        'Patchy rain possible': 'ð¦ï¸', 'Patchy snow possible': 'ð¨ï¸',
-        'Patchy sleet possible': 'ð¨ï¸', 'Patchy freezing drizzle possible': 'ð¦ï¸',
-        'Thundery outbreaks possible': 'âï¸', 'Blowing snow': 'âï¸', 'Blizzard': 'âï¸',
-        'Patchy light drizzle': 'ð¦ï¸', 'Light drizzle': 'ð¦ï¸',
-        'Freezing drizzle': 'ð¦ï¸', 'Heavy freezing drizzle': 'ð¦ï¸',
-        'Patchy light rain': 'ð¦ï¸', 'Light rain': 'ð¦ï¸',
-        'Moderate rain at times': 'ð§ï¸', 'Moderate rain': 'ð§ï¸',
-        'Heavy rain at times': 'ð§ï¸', 'Heavy rain': 'ð§ï¸',
-        'Light freezing rain': 'ð¨ï¸', 'Moderate or heavy freezing rain': 'ð¨ï¸',
-        'Light sleet': 'ð¨ï¸', 'Moderate or heavy sleet': 'ð¨ï¸',
-        'Patchy light snow': 'ð¨ï¸', 'Light snow': 'ð¨ï¸',
-        'Patchy moderate snow': 'âï¸', 'Moderate snow': 'âï¸',
-        'Patchy heavy snow': 'âï¸', 'Heavy snow': 'âï¸', 'Ice pellets': 'ð§',
-        'Light rain shower': 'ð¦ï¸', 'Moderate or heavy rain shower': 'ð§ï¸',
-        'Torrential rain shower': 'ð§ï¸',
-        'Light sleet showers': 'ð¨ï¸', 'Moderate or heavy sleet showers': 'ð¨ï¸',
-        'Light snow showers': 'ð¨ï¸', 'Moderate or heavy snow showers': 'ð¨ï¸',
-        'Light showers of ice pellets': 'ð§', 'Moderate or heavy showers of ice pellets': 'ð§',
-        'Patchy light rain with thunder': 'âï¸', 'Moderate or heavy rain with thunder': 'âï¸',
-        'Patchy light snow with thunder': 'âï¸', 'Moderate or heavy snow with thunder': 'âï¸',
-        'Moderate or heavy snow showers': 'ð¨ï¸',
+        'Sunny': '☀️', 'Clear': '🌙', 'Partly cloudy': '⛅', 'Cloudy': '🌥️',
+        'Overcast': '☁️', 'Mist': '🌫️', 'Fog': '🌫️', 'Freezing fog': '🌫️',
+        'Patchy rain possible': '🌦️', 'Patchy snow possible': '🌨️',
+        'Patchy sleet possible': '🌨️', 'Patchy freezing drizzle possible': '🌦️',
+        'Thundery outbreaks possible': '⛈️', 'Blowing snow': '❄️', 'Blizzard': '❄️',
+        'Patchy light drizzle': '🌦️', 'Light drizzle': '🌦️',
+        'Freezing drizzle': '🌦️', 'Heavy freezing drizzle': '🌦️',
+        'Patchy light rain': '🌦️', 'Light rain': '🌦️',
+        'Moderate rain at times': '🌧️', 'Moderate rain': '🌧️',
+        'Heavy rain at times': '🌧️', 'Heavy rain': '🌧️',
+        'Light freezing rain': '🌨️', 'Moderate or heavy freezing rain': '🌨️',
+        'Light sleet': '🌨️', 'Moderate or heavy sleet': '🌨️',
+        'Patchy light snow': '🌨️', 'Light snow': '🌨️',
+        'Patchy moderate snow': '❄️', 'Moderate snow': '❄️',
+        'Patchy heavy snow': '❄️', 'Heavy snow': '❄️', 'Ice pellets': '🧊',
+        'Light rain shower': '🌦️', 'Moderate or heavy rain shower': '🌧️',
+        'Torrential rain shower': '🌧️',
+        'Light sleet showers': '🌨️', 'Moderate or heavy sleet showers': '🌨️',
+        'Light snow showers': '🌨️', 'Moderate or heavy snow showers': '🌨️',
+        'Light showers of ice pellets': '🧊', 'Moderate or heavy showers of ice pellets': '🧊',
+        'Patchy light rain with thunder': '⛈️', 'Moderate or heavy rain with thunder': '⛈️',
+        'Patchy light snow with thunder': '⛈️', 'Moderate or heavy snow with thunder': '⛈️',
+        'Moderate or heavy snow showers': '🌨️',
 
-        'default': 'ð¡ï¸'
+        'default': '🌡️'
     };
 
     function getEmoji(condition) {
@@ -90,19 +90,19 @@
         return weatherEmojis[condition] || weatherEmojis[condition.toLowerCase()] || weatherEmojis['default'];
     }
 
-    /* ââ Temperature Conversion ââ */
+    /* ── Temperature Conversion ── */
     function tempC(val) { return Math.round(val); }
     function tempDisplay(celsius) {
-        if (useCelsius) return Math.round(celsius) + "Â°C";
-        return Math.round(celsius * 9 / 5 + 32) + "Â°F";
+        if (useCelsius) return Math.round(celsius) + "°C";
+        return Math.round(celsius * 9 / 5 + 32) + "°F";
     }
     function tempNum(celsius) {
         if (useCelsius) return Math.round(celsius);
         return Math.round(celsius * 9 / 5 + 32);
     }
-    function tempUnit() { return useCelsius ? "Â°C" : "Â°F"; }
+    function tempUnit() { return useCelsius ? "°C" : "°F"; }
 
-    /* ââ Date Formatting ââ */
+    /* ── Date Formatting ── */
     function formatDay(dateStr) {
         const d = new Date(dateStr + "T12:00:00");
         return d.toLocaleDateString("en-US", { weekday: "long" });
@@ -124,7 +124,7 @@
         return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     }
 
-    /* ââ Normalize Data ââ */
+    /* ── Normalize Data ── */
     function normalizeMeteoSource(data) {
         if (!data || !data.daily || !data.daily.data) return [];
         return data.daily.data.slice(0, 5).map(day => ({
@@ -161,7 +161,7 @@
 
     function normalizeOpenWeather(data) {
         if (!data || !data.list) return [];
-        /* OpenWeather 5-day/3-hour â group by day, take noon or first entry */
+        /* OpenWeather 5-day/3-hour → group by day, take noon or first entry */
         const byDay = {};
         data.list.forEach(item => {
             const dateKey = item.dt_txt ? item.dt_txt.split(" ")[0] : formatDateFromTimestamp(item.dt);
@@ -191,7 +191,7 @@
         });
     }
 
-    /* ââ Rendering ââ */
+    /* ── Rendering ── */
     function renderSourceCards(containerId, days) {
         const container = document.getElementById(containerId);
         if (!container) return;
@@ -289,7 +289,7 @@
                     <span class="cs-icon">${day.emoji}</span>
                     <span class="cs-temp">${tempDisplay(day.temp)}</span>
                 </div>
-                <div class="cs-range">${tempDisplay(day.min)} â ${tempDisplay(day.max)}</div>
+                <div class="cs-range">${tempDisplay(day.min)} – ${tempDisplay(day.max)}</div>
                 <div class="cs-condition">${day.conditionShort}</div>
                 <div class="cs-wind">Wind: ${day.wind.toFixed(1)} km/h</div>
             </div>
@@ -307,7 +307,7 @@
         renderComparison();
     }
 
-    /* ââ Tab Switching ââ */
+    /* ── Tab Switching ── */
     document.querySelectorAll(".tab-btn").forEach(btn => {
         btn.addEventListener("click", () => {
             document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -319,14 +319,14 @@
         });
     });
 
-    /* ââ Unit Toggle ââ */
+    /* ── Unit Toggle ── */
     elUnitToggle.addEventListener("click", () => {
         useCelsius = !useCelsius;
-        elUnitToggle.textContent = useCelsius ? "Â°C" : "Â°F";
+        elUnitToggle.textContent = useCelsius ? "°C" : "°F";
         renderAll();
     });
 
-    /* ââ Date/Time ââ */
+    /* ── Date/Time ── */
     function updateDateTime() {
         if (elDateTime) {
             const now = new Date();
@@ -339,7 +339,7 @@
     updateDateTime();
     setInterval(updateDateTime, 1000);
 
-    /* ââ Data Fetching ââ */
+    /* ── Data Fetching ── */
     let fetchCount = 0;
     const TOTAL_FETCHES = 3;
 
@@ -378,7 +378,7 @@
             .finally(checkAllLoaded);
     }
 
-    /* ââ Location ââ */
+    /* ── Location ── */
     function setLocation(lat, lon) {
         const locUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`;
         fetch(locUrl)
@@ -396,7 +396,7 @@
             });
     }
 
-    /* ââ Init ââ */
+    /* ── Init ── */
     function init() {
         if (navigator.geolocation) {
             const geoTimer = setTimeout(() => {
